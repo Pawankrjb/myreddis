@@ -1,4 +1,5 @@
 import net from 'node:net';
+import path from 'node:path';
 // import { array } from 'node:stream/iter';
 
 const database= new Map();
@@ -98,7 +99,23 @@ const server= net.createServer((c) => {
             }
 
         }
-
+        else if(parts[0]==='PERSIST'){
+            const key=parts[1];
+            const entry=database.get(key);
+            
+            if(entry){
+                if(entry.expiry===null){
+                c.write(0+'\r\n');
+                
+            }else{
+                entry.expiry=null;
+                c.write(1+'\r\n');
+            }
+            }
+            else{
+             c.write(0+'\r\n');
+            }
+        }
         else{
             c.write('unknown command\r\n');
         }
