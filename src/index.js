@@ -344,6 +344,38 @@ const server = net.createServer((c) => {
                 c.write(0 + '\r\n');
             }
         }
+        else if(parts[0]==='HGETALL'){
+            const key=parts[1];
+            const entry=database.get(key);
+            if(entry){
+                if(entry.type==='hash'){
+                    for(const field in entry.value){
+                        c.write(field+'\r\n');
+                        c.write(entry.value[field]+'\r\n');
+                    }
+                }
+                else{
+                    c.write(0+'\r\n');
+                }
+            }
+            else{
+                 c.write(0+'\r\n');
+            }
+        }
+        else if(parts[0]==='HLEN'){
+            const key = parts[1];
+            const entry = database.get(key);
+
+            if (entry) {
+                if (entry.type === 'hash') {
+                  c.write(Object.keys(entry.value).length + '\r\n');
+                } else {
+                    c.write(0 + '\r\n');
+                }
+            } else {
+                c.write(0 + '\r\n');
+            }
+        }
         else {
             c.write('unknown command\r\n');
         }
