@@ -114,7 +114,7 @@ const server = net.createServer((c) => {
                         c.write(0 + '\r\n');
                     }
                     else {
-                        entry.expiry = currentTime+ time * 1000;
+                        entry.expiry = currentTime + time * 1000;
                         c.write(1 + '\r\n');
                     }
                 }
@@ -171,7 +171,45 @@ const server = net.createServer((c) => {
                 c.write(0 + '\r\n');
             }
         }
+        else if (parts[0] === 'LPUSH') {
+            const key = parts[1];
+            const value = parts[2];
+            const entry = database.get(key);
 
+            if (!entry) {
+                database.set(key, { type: "list", value: [value], expiry: null })
+                c.write(1 + '\r\n');
+            }
+            else if (entry.type === 'list') {
+
+                entry.value.unshift(value);
+                c.write(1 + '\r\n');
+            }
+            else {
+                c.write(0 + '\r\n');
+            }
+
+
+        }
+
+        else if(parts[0]==='LRANGE'){
+            const key=parts[1]
+            const entry=database.get(key);
+            if(entry){
+              if(entry.type==='list'){
+                entry.value.forEach((item)=>{
+                   c.write(item+'\r\n');  
+                })
+               
+              }
+              else{
+                 c.write('NULL\r\n');
+              }
+            }
+            else{
+                 c.write('NULL\r\n');
+            }
+        }
         else {
             c.write('unknown command\r\n');
         }
