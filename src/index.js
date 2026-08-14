@@ -192,22 +192,90 @@ const server = net.createServer((c) => {
 
         }
 
-        else if(parts[0]==='LRANGE'){
-            const key=parts[1]
-            const entry=database.get(key);
-            if(entry){
-              if(entry.type==='list'){
-                entry.value.forEach((item)=>{
-                   c.write(item+'\r\n');  
-                })
-               
-              }
-              else{
-                 c.write('NULL\r\n');
-              }
+        else if (parts[0] === 'LRANGE') {
+            const key = parts[1]
+            const entry = database.get(key);
+            if (entry) {
+                if (entry.type === 'list') {
+                    entry.value.forEach((item) => {
+                        c.write(item + '\r\n');
+                    })
+
+                }
+                else {
+                    c.write('NULL\r\n');
+                }
             }
-            else{
-                 c.write('NULL\r\n');
+            else {
+                c.write('NULL\r\n');
+            }
+        }
+        else if (parts[0] === 'LPOP') {
+            const key = parts[1];
+            const entry = database.get(key);
+            if (entry) {
+                if (entry.type === 'list') {
+
+                    const remove = entry.value.shift();
+                    c.write(remove + '\r\n');
+                }
+                else {
+                    c.write(0 + '\r\n');
+                }
+            }
+            else {
+                c.write(0 + '\r\n');
+            }
+        }
+        else if (parts[0] === 'RPOP') {
+            const key = parts[1];
+            const entry = database.get(key);
+            if (entry) {
+                if (entry.type === 'list') {
+
+                    const remove = entry.value.pop();
+                    c.write(remove + '\r\n');
+                }
+                else {
+                    c.write(0 + '\r\n');
+                }
+            }
+            else {
+                c.write(0 + '\r\n');
+            }
+        }
+        else if (parts[0] === 'RPUSH') {
+            const key = parts[1];
+            const value = parts[2];
+            const entry = database.get(key);
+
+            if (!entry) {
+                database.set(key, { type: "list", value: [value], expiry: null })
+                c.write(1 + '\r\n');
+            }
+            else if (entry.type === 'list') {
+
+                entry.value.push(value);
+                c.write(1 + '\r\n');
+            }
+            else {
+                c.write(0 + '\r\n');
+            }
+
+
+        }
+        else if (parts[0] === 'LLEN') {
+            const key = parts[1];
+            const entry = database.get(key);
+
+            if (entry) {
+                if (entry.type === 'list') {
+                    c.write(entry.value.length + '\r\n');
+                } else {
+                    c.write(0 + '\r\n');
+                }
+            } else {
+                c.write(0 + '\r\n');
             }
         }
         else {
