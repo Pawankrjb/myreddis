@@ -1,5 +1,6 @@
 import net from 'node:net';
 import path from 'node:path';
+import { parseEnv } from 'node:util';
 // import { array } from 'node:stream/iter';
 
 const database = new Map();
@@ -275,6 +276,71 @@ const server = net.createServer((c) => {
                     c.write(0 + '\r\n');
                 }
             } else {
+                c.write(0 + '\r\n');
+            }
+        }
+        else if (parts[0] === 'HSET') {
+            const key = parts[1];
+            const field = parts[2];
+            const data = parts[3];
+            const entry = database.get(key);
+            if (!entry) {
+                database.set(key, {
+                    type: "hash",
+                    value: { [field]: data },
+                    expiry: null
+                })
+                c.write(1 + '\r\n');
+            }
+            else if (entry.type === 'hash') {
+                entry.value[field] = data;
+                c.write(1 + '\r\n');
+            }
+            else {
+                c.write(0 + '\r\n');
+            }
+        }
+        else if (parts[0] == 'HGET') {
+            const key = parts[1];
+            const field = parts[2];
+            const entry = database.get(key);
+            if (entry) {
+                if (entry.type === 'hash') {
+                    const result = entry.value[field];
+                    if (result !== undefined) {
+
+                        c.write(result + '\r\n');
+
+                    } else {
+
+                        c.write('NULL\r\n');
+
+                    }
+                    
+                }
+                else {
+                    c.write('NULL\r\n');
+                }
+            }
+            else {
+                c.write('NULL\r\n');
+            }
+        }
+        else if (parts[0] === 'HDEL') {
+            const key = parts[1];
+            const field = parts[2];
+            const entry = database.get(key);
+            if (entry) {
+                if (entry.type === 'hash') {
+                    delete entry.value[field];
+                    c.write(1 + '\r\n');
+                }
+                else {
+                    c.write(0 + '\r\n');
+                }
+
+            }
+            else {
                 c.write(0 + '\r\n');
             }
         }
