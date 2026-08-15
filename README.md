@@ -341,12 +341,15 @@ When the last item is removed from a list, the key is deleted.
 Example:
 
 LPUSH users Pawan
+
 1
 
 LPOP users
+
 Pawan
 
 EXISTS users
+
 0
 
 Similarly, when the last field of a hash is deleted:
