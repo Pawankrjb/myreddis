@@ -4,9 +4,9 @@
     "value": "add",
     "expiry": null
   },
-  "name": {
+  "user": {
     "type": "string",
-    "value": "adfa",
+    "value": "amna",
     "expiry": null
   }
 }
