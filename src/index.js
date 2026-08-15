@@ -1,9 +1,56 @@
 import net from 'node:net';
 import path from 'node:path';
 import { parseEnv } from 'node:util';
+import fs from 'node:fs';
 // import { array } from 'node:stream/iter';
 
 const database = new Map();
+loadDatabase();
+function saveDatabase(){
+    const data=Object.fromEntries(database);
+    fs.writeFileSync('database.json',JSON.stringify(data,null,2))
+}
+function loadDatabase(){
+    if(!fs.existsSync('database.json')){
+        return;
+    }
+    const data =JSON.parse(fs.readFileSync('database.json','utf-8'));
+    for(const [key,entry] of Object.entries(data)){
+        database.set(key,entry);
+    }
+}
+function isExpired(entry) {
+    if (entry.expiry === null) {
+        return false;
+    }
+    return entry.expiry < Date.now();
+}
+function isvalidkey(key) {
+    const entry = database.get(key);
+    if (!entry) {
+        return null;
+    }
+    if (isExpired(entry)) {
+        database.delete(key);
+        saveDatabase();
+        return null;
+    }
+    return entry;
+}
+setInterval(() => {
+     let changed=false;
+    for (const [key, entry] of database) {
+       
+        if (isExpired(entry)) {
+            database.delete(key);
+            changed=true;
+
+        }
+    }
+    if(changed){
+        saveDatabase();
+    }
+}, 1000);
 const server = net.createServer((c) => {
     console.log('client connected');
     c.on('end', () => {
@@ -13,27 +60,12 @@ const server = net.createServer((c) => {
     c.on('data', (data) => {
         const command = data.toString().trim();
         const parts = command.split(' ');
-        function isExpired(entry) {
-            if (entry.expiry === null) {
-                return false;
-            }
-            return entry.expiry < Date.now();
-        }
-        function isvalidkey(key) {
-            const entry = database.get(key);
-            if (!entry) {
-                return null;
-            }
-            if (isExpired(entry)) {
-                database.delete(key);
-                return null;
-            }
-            return entry;
-        }
+
         if (parts[0] === 'SET') {
             const key = parts[1];
             const value = parts[2];
             database.set(key, { type: "string", value: value, expiry: null });
+            saveDatabase();
             c.write('OK\r\n');
         }
         else if (parts[0] === 'GET') {
@@ -53,7 +85,9 @@ const server = net.createServer((c) => {
         else if (parts[0] === 'DEL') {
             const key = parts[1];
             const value = database.delete(key);
+
             if (value) {
+                saveDatabase();
                 c.write(1 + '\r\n');
             }
             else {
@@ -98,6 +132,7 @@ const server = net.createServer((c) => {
 
         else if (parts[0] === 'FLUSHALL') {
             database.clear();
+            saveDatabase();
             c.write('OK\r\n');
         }
 
@@ -109,14 +144,17 @@ const server = net.createServer((c) => {
             if (entry) {
                 if (entry.expiry === null) {
                     entry.expiry = currentTime + time * 1000;
+                    saveDatabase();
                     c.write(1 + '\r\n');
                 } else {
                     if (entry.expiry < currentTime) {
                         database.delete(key);
+                        saveDatabase();
                         c.write(0 + '\r\n');
                     }
                     else {
                         entry.expiry = currentTime + time * 1000;
+                        saveDatabase();
                         c.write(1 + '\r\n');
                     }
                 }
@@ -153,10 +191,12 @@ const server = net.createServer((c) => {
                 } else {
                     if (entry.expiry < currentTime) {
                         database.delete(key);
+                        saveDatabase()
                         c.write(0 + ' \r\n');
                     }
                     else {
                         entry.expiry = null;
+                        saveDatabase();
                         c.write(1 + '\r\n');
                     }
                 }
@@ -187,12 +227,21 @@ const server = net.createServer((c) => {
         }
 
         else if (parts[0] === 'LRANGE') {
-            const key = parts[1]
+            const key = parts[1];
+            const start = Number(parts[2]);
+            const end = Number(parts[3]);
+
             const entry = isvalidkey(key);
 
             if (entry) {
                 if (entry.type === 'list') {
-                    entry.value.forEach((item) => {
+                    let result;
+                    if (end === -1) {
+                        result = entry.value.slice(start);
+                    } else {
+                        result = entry.value.slice(start, end + 1);
+                    }
+                    result.forEach((item) => {
                         c.write(item + '\r\n');
                     })
 
@@ -211,10 +260,13 @@ const server = net.createServer((c) => {
             if (entry) {
                 if (entry.type === 'list') {
 
-                    const remove = entry.value.shift();
+                   
                     if (entry.value.length === 0) {
                         database.delete(key)
+                        
                     }
+                     const remove = entry.value.shift();
+                    saveDatabase()
                     c.write(remove + '\r\n');
                 }
                 else {
@@ -231,11 +283,13 @@ const server = net.createServer((c) => {
             if (entry) {
                 if (entry.type === 'list') {
 
-                    const remove = entry.value.pop();
+                  
                     if (entry.value.length === 0) {
 
                         database.delete(key);
                     }
+                      const remove = entry.value.pop();
+                      saveDatabase();
                     c.write(remove + '\r\n');
                 }
                 else {
@@ -253,11 +307,13 @@ const server = net.createServer((c) => {
 
             if (!entry) {
                 database.set(key, { type: "list", value: [value], expiry: null })
+                saveDatabase();
                 c.write(1 + '\r\n');
             }
             else if (entry.type === 'list') {
 
                 entry.value.push(value);
+                saveDatabase();
                 c.write(1 + '\r\n');
             }
             else {
@@ -291,10 +347,12 @@ const server = net.createServer((c) => {
                     value: { [field]: data },
                     expiry: null
                 })
+                saveDatabase();
                 c.write(1 + '\r\n');
             }
             else if (entry.type === 'hash') {
                 entry.value[field] = data;
+                saveDatabase();
                 c.write(1 + '\r\n');
             }
             else {
@@ -333,14 +391,16 @@ const server = net.createServer((c) => {
             const entry = database.get(key);
             if (entry) {
                 if (entry.type === 'hash') {
-                    if(entry.value[field]!==undefined){
-                        
-                     delete entry.value[field];
-                    
-                   if(Object.keys(entry.value).length===0){
-                      database.delete(key);
-                   }
-                }
+                    if (entry.value[field] !== undefined) {
+
+                        delete entry.value[field];
+                   
+
+                        if (Object.keys(entry.value).length === 0) {
+                            database.delete(key);
+                        }
+                    }
+                         saveDatabase();
                     c.write(1 + '\r\n');
                 }
                 else {
