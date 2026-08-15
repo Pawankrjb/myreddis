@@ -260,9 +260,11 @@ Now you can enter commands directly.
 ## Example Session
 
 SET name Pawan
+
 OK
 
 GET name
+
 Pawan
 
 LPUSH users Rahul
