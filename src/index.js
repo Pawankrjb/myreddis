@@ -13,6 +13,23 @@ const server = net.createServer((c) => {
     c.on('data', (data) => {
         const command = data.toString().trim();
         const parts = command.split(' ');
+        function isExpired(entry) {
+            if (entry.expiry === null) {
+                return false;
+            }
+            return entry.expiry < Date.now();
+        }
+        function isvalidkey(key) {
+            const entry = database.get(key);
+            if (!entry) {
+                return null;
+            }
+            if (isExpired(entry)) {
+                database.delete(key);
+                return null;
+            }
+            return entry;
+        }
         if (parts[0] === 'SET') {
             const key = parts[1];
             const value = parts[2];
@@ -21,24 +38,14 @@ const server = net.createServer((c) => {
         }
         else if (parts[0] === 'GET') {
             const key = parts[1];
-            const entry = database.get(key);
+            const entry = isvalidkey(key);
 
-            if (entry) {
-                if (entry.type === "string") {
-                    const currentTime = Date.now();
-                    if (entry.expiry && entry.expiry < currentTime) {
-                        database.delete(key);
-                        c.write('NULL\r\n');
-                    }
-                    else {
-                        c.write(entry.value + '\r\n');
-                    }
-
-                }
-                else {
-                    c.write('NULL\r\n');
-                }
-            } else {
+            if (!entry) {
+                c.write('NULL\r\n');
+            } else if (entry.type === 'string') {
+                c.write(entry.value + '\r\n');
+            }
+            else {
                 c.write('NULL\r\n');
             }
 
@@ -55,21 +62,17 @@ const server = net.createServer((c) => {
         }
         else if (parts[0] === 'EXISTS') {
             const key = parts[1];
-            const value = database.has(key);
-            const entry = database.get(key)
-            const currentTime = Date.now();
-            if (value) {
-                if (entry.expiry && entry.expiry < currentTime) {
-                    database.delete(key);
-                    c.write(0 + '\r\n');
-                }
-                else {
-                    c.write(1 + '\r\n');
-                }
-            }
-            else {
+
+            const entry = isvalidkey(key)
+
+            if (!entry) {
                 c.write(0 + '\r\n');
             }
+            else {
+                c.write(1 + '\r\n');
+            }
+
+
         }
         else if (parts[0] === 'KEYS') {
 
@@ -80,11 +83,9 @@ const server = net.createServer((c) => {
             if (value) {
 
                 Array.from(value).forEach((key) => {
-                    const entry = database.get(key);
-                    if (entry.expiry && entry.expiry < currentTime) {
-                        database.delete(key);
+                    const entry = isvalidkey(key);
+                    if (entry) {
 
-                    } else {
                         c.write(key + '\r\n');
                     }
                 });
@@ -126,26 +127,18 @@ const server = net.createServer((c) => {
         }
         else if (parts[0] === 'TTL') {
             const key = parts[1];
-            const entry = database.get(key);
+            const entry = isvalidkey(key);
+
             const currentTime = Date.now();
-            if (entry) {
-                if (entry.expiry && entry.expiry < currentTime) {
-                    database.delete(key);
-                    c.write(-2 + ' \r\n');
-                }
-
-                else if (entry.expiry > currentTime) {
-                    const timeleft = (entry.expiry - currentTime) / 1000;
-
-                    c.write(Math.floor(timeleft) + '\r\n');
-                }
-                else {
-                    c.write(-1 + '\r\n')
-                }
-            } else {
+            if (!entry) {
                 c.write(-2 + '\r\n');
             }
-
+            else if (entry.expiry === null) {
+                c.write(-1 + '\r\n');
+            } else {
+                const timeleft = (entry.expiry - Date.now()) / 1000;
+                c.write(Math.floor(timeleft) + '\r\n');
+            }
         }
         else if (parts[0] === 'PERSIST') {
             const key = parts[1];
@@ -195,7 +188,8 @@ const server = net.createServer((c) => {
 
         else if (parts[0] === 'LRANGE') {
             const key = parts[1]
-            const entry = database.get(key);
+            const entry = isvalidkey(key);
+
             if (entry) {
                 if (entry.type === 'list') {
                     entry.value.forEach((item) => {
@@ -213,11 +207,14 @@ const server = net.createServer((c) => {
         }
         else if (parts[0] === 'LPOP') {
             const key = parts[1];
-            const entry = database.get(key);
+            const entry = isvalidkey(key);
             if (entry) {
                 if (entry.type === 'list') {
 
                     const remove = entry.value.shift();
+                    if (entry.value.length === 0) {
+                        database.delete(key)
+                    }
                     c.write(remove + '\r\n');
                 }
                 else {
@@ -230,11 +227,15 @@ const server = net.createServer((c) => {
         }
         else if (parts[0] === 'RPOP') {
             const key = parts[1];
-            const entry = database.get(key);
+            const entry = isvalidkey(key);
             if (entry) {
                 if (entry.type === 'list') {
 
                     const remove = entry.value.pop();
+                    if (entry.value.length === 0) {
+
+                        database.delete(key);
+                    }
                     c.write(remove + '\r\n');
                 }
                 else {
@@ -248,7 +249,7 @@ const server = net.createServer((c) => {
         else if (parts[0] === 'RPUSH') {
             const key = parts[1];
             const value = parts[2];
-            const entry = database.get(key);
+            const entry = isvalidkey(key);
 
             if (!entry) {
                 database.set(key, { type: "list", value: [value], expiry: null })
@@ -267,7 +268,7 @@ const server = net.createServer((c) => {
         }
         else if (parts[0] === 'LLEN') {
             const key = parts[1];
-            const entry = database.get(key);
+            const entry = isvalidkey(key);
 
             if (entry) {
                 if (entry.type === 'list') {
@@ -283,7 +284,7 @@ const server = net.createServer((c) => {
             const key = parts[1];
             const field = parts[2];
             const data = parts[3];
-            const entry = database.get(key);
+            const entry = isvalidkey(key);
             if (!entry) {
                 database.set(key, {
                     type: "hash",
@@ -303,7 +304,7 @@ const server = net.createServer((c) => {
         else if (parts[0] == 'HGET') {
             const key = parts[1];
             const field = parts[2];
-            const entry = database.get(key);
+            const entry = isvalidkey(key);
             if (entry) {
                 if (entry.type === 'hash') {
                     const result = entry.value[field];
@@ -316,7 +317,7 @@ const server = net.createServer((c) => {
                         c.write('NULL\r\n');
 
                     }
-                    
+
                 }
                 else {
                     c.write('NULL\r\n');
@@ -332,7 +333,14 @@ const server = net.createServer((c) => {
             const entry = database.get(key);
             if (entry) {
                 if (entry.type === 'hash') {
-                    delete entry.value[field];
+                    if(entry.value[field]!==undefined){
+                        
+                     delete entry.value[field];
+                    
+                   if(Object.keys(entry.value).length===0){
+                      database.delete(key);
+                   }
+                }
                     c.write(1 + '\r\n');
                 }
                 else {
@@ -344,31 +352,31 @@ const server = net.createServer((c) => {
                 c.write(0 + '\r\n');
             }
         }
-        else if(parts[0]==='HGETALL'){
-            const key=parts[1];
-            const entry=database.get(key);
-            if(entry){
-                if(entry.type==='hash'){
-                    for(const field in entry.value){
-                        c.write(field+'\r\n');
-                        c.write(entry.value[field]+'\r\n');
+        else if (parts[0] === 'HGETALL') {
+            const key = parts[1];
+            const entry = isvalidkey(key);
+            if (entry) {
+                if (entry.type === 'hash') {
+                    for (const field in entry.value) {
+                        c.write(field + '\r\n');
+                        c.write(entry.value[field] + '\r\n');
                     }
                 }
-                else{
-                    c.write(0+'\r\n');
+                else {
+                    c.write(0 + '\r\n');
                 }
             }
-            else{
-                 c.write(0+'\r\n');
+            else {
+                c.write(0 + '\r\n');
             }
         }
-        else if(parts[0]==='HLEN'){
+        else if (parts[0] === 'HLEN') {
             const key = parts[1];
-            const entry = database.get(key);
+            const entry = isvalidkey(key);
 
             if (entry) {
                 if (entry.type === 'hash') {
-                  c.write(Object.keys(entry.value).length + '\r\n');
+                    c.write(Object.keys(entry.value).length + '\r\n');
                 } else {
                     c.write(0 + '\r\n');
                 }
