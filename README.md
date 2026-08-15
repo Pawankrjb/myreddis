@@ -278,17 +278,22 @@ Pawan
 Rahul
 
 HSET student name Pawan
+
 1
 
 HSET student age 22
+
 1
 
 HGET student name
+
 Pawan
 
 HGETALL student
+
 name
 Pawan
+
 age
 22
 
@@ -322,6 +327,7 @@ node src/index.js
 Then:
 
 GET username
+
 Pawan
 
 The value is restored from database.json.
@@ -344,12 +350,15 @@ EXISTS users
 Similarly, when the last field of a hash is deleted:
 
 HSET user name Pawan
+
 1
 
 HDEL user name
+
 1
 
 EXISTS user
+
 0
 
 ## Tech Stack
