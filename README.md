@@ -266,9 +266,11 @@ GET name
 Pawan
 
 LPUSH users Rahul
+
 1
 
 LPUSH users Pawan
+
 1
 
 LRANGE users 0 -1
