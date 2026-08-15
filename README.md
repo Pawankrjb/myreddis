@@ -260,15 +260,19 @@ Now you can enter commands directly.
 ## Example Session
 
 SET name Pawan
+
 OK
 
 GET name
+
 Pawan
 
 LPUSH users Rahul
+
 1
 
 LPUSH users Pawan
+
 1
 
 LRANGE users 0 -1
@@ -276,17 +280,22 @@ Pawan
 Rahul
 
 HSET student name Pawan
+
 1
 
 HSET student age 22
+
 1
 
 HGET student name
+
 Pawan
 
 HGETALL student
+
 name
 Pawan
+
 age
 22
 
@@ -320,6 +329,7 @@ node src/index.js
 Then:
 
 GET username
+
 Pawan
 
 The value is restored from database.json.
@@ -331,23 +341,29 @@ When the last item is removed from a list, the key is deleted.
 Example:
 
 LPUSH users Pawan
+
 1
 
 LPOP users
+
 Pawan
 
 EXISTS users
+
 0
 
 Similarly, when the last field of a hash is deleted:
 
 HSET user name Pawan
+
 1
 
 HDEL user name
+
 1
 
 EXISTS user
+
 0
 
 ## Tech Stack
