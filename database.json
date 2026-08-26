@@ -1,12 +1,7 @@
 {
-  "user5": {
+  "name": {
     "type": "string",
-    "value": "add",
-    "expiry": null
-  },
-  "user": {
-    "type": "string",
-    "value": "amna",
+    "value": "addi",
     "expiry": null
   }
 }

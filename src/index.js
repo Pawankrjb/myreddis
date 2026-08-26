@@ -2,14 +2,16 @@ import net from 'node:net';
 import path from 'node:path';
 import { parseEnv } from 'node:util';
 import fs from 'node:fs';
+import { database } from './database/database.js';
+import { check, isvalid } from './utils/validation.js';
+import { saveDatabase } from './database/persistence.js';
+import { isvalidkey } from './utils/expiry.js';
+
 // import { array } from 'node:stream/iter';
 
-const database = new Map();
+
 loadDatabase();
-function saveDatabase(){
-    const data=Object.fromEntries(database);
-    fs.writeFileSync('database.json',JSON.stringify(data,null,2))
-}
+
 function loadDatabase(){
     if(!fs.existsSync('database.json')){
         return;
@@ -19,30 +21,7 @@ function loadDatabase(){
         database.set(key,entry);
     }
 }
-function isExpired(entry) {
-    if (entry.expiry === null) {
-        return false;
-    }
-    return entry.expiry < Date.now();
-}
-function isvalidkey(key) {
-    const entry = database.get(key);
-    if (!entry) {
-        return null;
-    }
-    if (isExpired(entry)) {
-        database.delete(key);
-        saveDatabase();
-        return null;
-    }
-    return entry;
-}
-function check(parts, required){
-    return parts.length===required;
-}
-function isvalid(value){
-    return !isNaN(value)&& Number(value)>=0; 
-}
+
 setInterval(() => {
      let changed=false;
     for (const [key, entry] of database) {
@@ -271,7 +250,7 @@ const server = net.createServer((c) => {
         }
 
         else if (parts[0] === 'LRANGE') {
-            if (!check(parts, 3)) {
+            if (!check(parts, 4)) {
               c.write('Err wrong number of arguments\r\n');
              return;
            }
